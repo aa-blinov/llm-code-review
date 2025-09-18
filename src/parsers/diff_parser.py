@@ -3,13 +3,7 @@ from typing import Any
 
 
 class DiffParser:
-    """Parses unified diff text into a simple structure expected by tests.
-
-    Tests expect:
-      parser = DiffParser(); parser.parse(diff_data) -> { 'file': <name>, 'changes': [ {line, old, new}, ... ] }
-      Empty diff -> {}
-      Invalid format -> ValueError
-    """
+    """Parses unified diff text into a simple structure."""
 
     FILE_HEADER_RE = re.compile(r"^diff --git a/(\S+) b/(\S+)")
     HUNK_HEADER_RE = re.compile(r"^@@ -(?P<old_start>\d+),(?P<old_len>\d+) \+(?P<new_start>\d+),(?P<new_len>\d+) @@")
@@ -35,21 +29,16 @@ class DiffParser:
                 old_line_no = int(hunk.group("old_start"))
                 new_line_no = int(hunk.group("new_start"))
                 continue
-            if (
-                line.startswith(("+++", "---", "diff --git", "index "))
-            ):
+            if line.startswith(("+++", "---", "diff --git", "index ")):
                 continue
             if old_line_no is None or new_line_no is None:
                 continue
             if line.startswith("-"):
                 removed_content = line[1:]
-                # Look ahead for added line forming a modification pair
-                # This simplistic logic will be enough for test sample
                 changes.append({"line": new_line_no, "old": removed_content, "new": None})
                 old_line_no += 1
             elif line.startswith("+"):
                 added_content = line[1:]
-                # Merge with previous removal if last change had new is None
                 if changes and changes[-1]["new"] is None:
                     changes[-1]["new"] = added_content
                 else:
@@ -59,7 +48,6 @@ class DiffParser:
                 old_line_no += 1
                 new_line_no += 1
 
-        # Filter only modifications that have both old & new for the test expectation
         modifications = [c for c in changes if c["old"] is not None and c["new"] is not None]
 
         return {
@@ -77,15 +65,13 @@ class DiffParser:
 
         for line in diff_text.splitlines():
             if line.startswith("diff --git"):
-                # Start of new file
                 if current_file_lines:
-                    # Process previous file
                     try:
                         file_diff = self.parse("\n".join(current_file_lines))
                         if file_diff:
                             files.append(file_diff)
                     except ValueError:
-                        pass  # Skip invalid diffs
+                        pass
                 current_file_lines = [line]
             else:
                 current_file_lines.append(line)
@@ -112,18 +98,15 @@ class DiffParser:
 
         for line in diff_text.splitlines():
             if line.startswith("diff --git"):
-                # Save previous chunk
                 if current_chunk and current_file:
                     chunks.append({"file": current_file, "diff": "\n".join(current_chunk)})
 
-                # Start new chunk
                 match = self.FILE_HEADER_RE.match(line)
                 current_file = match.group(2) if match else "unknown"
                 current_chunk = [line]
             else:
                 current_chunk.append(line)
 
-        # Save last chunk
         if current_chunk and current_file:
             chunks.append({"file": current_file, "diff": "\n".join(current_chunk)})
 

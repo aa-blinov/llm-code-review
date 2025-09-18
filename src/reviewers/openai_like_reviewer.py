@@ -1,3 +1,5 @@
+"""OpenAI-compatible code reviewer for various providers."""
+
 from typing import Any
 
 from loguru import logger
@@ -6,25 +8,30 @@ from tqdm import tqdm
 from src.config import Config
 from src.parsers.diff_parser import DiffParser
 from src.reviewers.base_reviewer import BaseReviewer
-from src.utils.gemini_client import GeminiClient
+from src.utils.openai_like_client import OpenAILikeClient
 
 
-class GeminiReviewer(BaseReviewer):
-    """Reviewer that uses Gemini AI to analyze merge requests."""
+class OpenAILikeReviewer(BaseReviewer):
+    """Code reviewer using OpenAI-compatible API with multiple provider support."""
 
-    def __init__(self, merge_request_data: dict[str, Any], client: GeminiClient | None = None):
-        """Initialize Gemini reviewer.
+    def __init__(self, merge_request_data: dict[str, Any], client: OpenAILikeClient | None = None):
+        """Initialize OpenAI-compatible reviewer.
 
         Args:
             merge_request_data: Merge request data
-            client: Optional Gemini client instance
+            client: Optional OpenAI-compatible client instance
         """
         super().__init__(merge_request_data)
-        self.enable_ai = bool(Config.GEMINI_API_KEY)
-        self._client = client or (GeminiClient() if self.enable_ai else None)
+        self.enable_ai = bool(Config.OPENAI_LIKE_API_KEY)
+        self._client = client or (OpenAILikeClient() if self.enable_ai else None)
         self._diff_parser = DiffParser()
 
     def get_review_comments(self) -> dict[str, Any]:
+        """Get review comments from OpenAI-compatible models.
+
+        Returns:
+            Dictionary with review results
+        """
         if not self.enable_ai or not self._client:
             return {"diff_comments": [], "summary": "", "file_reviews": []}
 
@@ -41,6 +48,7 @@ class GeminiReviewer(BaseReviewer):
                     pbar.set_description(f"Analyzing: {file_path.split('/')[-1]}")
                     diff = change["diff"]
                     new_content = change["new_content"]
+
                     context_parts = []
 
                     if change["new_file"]:
@@ -92,7 +100,7 @@ class GeminiReviewer(BaseReviewer):
             logger.info("Building overall summary...")
             try:
                 if all_comments:
-                    summary = self._client.global_summary("\n".join(all_comments), self.merge_request_data)
+                    summary = self._client.global_summary("\n".join(all_comments))
                 else:
                     summary = "Серьёзных проблем в коде не обнаружено."
             except Exception as exc:
@@ -137,7 +145,7 @@ class GeminiReviewer(BaseReviewer):
 
         try:
             if all_comments:
-                summary = self._client.global_summary("\n".join(all_comments), self.merge_request_data)
+                summary = self._client.global_summary("\n".join(all_comments))
             else:
                 summary = "Серьёзных проблем в коде не обнаружено."
         except Exception as exc:
@@ -151,12 +159,12 @@ class GeminiReviewer(BaseReviewer):
         }
 
     def is_available(self) -> bool:
-        """Check if Gemini reviewer is available.
+        """Check if OpenAI-compatible reviewer is available.
 
         Returns:
             True if API key is configured and client is ready
         """
-        return self.enable_ai and self._client is not None
+        return self.enable_ai and self._client is not None and self._client.is_available()
 
     @property
     def provider_name(self) -> str:
@@ -166,5 +174,5 @@ class GeminiReviewer(BaseReviewer):
             Provider name with model info
         """
         if self._client:
-            return f"Gemini ({self._client.model})"
-        return "Gemini (unavailable)"
+            return self._client.provider_name
+        return "OpenAI-Like (unavailable)"

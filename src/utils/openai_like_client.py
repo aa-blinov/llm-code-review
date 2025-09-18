@@ -1,8 +1,6 @@
-"""Google Gemini API client using official google-genai SDK."""
+"""OpenAI-compatible API client for various providers (supports any OpenAI-compatible API)."""
 
 from __future__ import annotations
-
-from typing import Any
 
 from src.config import Config
 from src.utils.logging import get_logger
@@ -10,33 +8,42 @@ from src.utils.logging import get_logger
 logger = get_logger()
 
 try:
-    from google import genai
-    from google.genai import types
+    from openai import OpenAI
 except ImportError:
-    logger.error("google-genai not installed. Run: pip install google-genai")
+    logger.error("OpenAI SDK not installed. Run: pip install openai")
     raise
 
 
-class GeminiClient:
-    """Official Google GenAI client wrapper."""
+class OpenAILikeClient:
+    """OpenAI-compatible API client for various providers."""
 
-    def __init__(self, api_key: str | None = None, model: str | None = None):
-        """Initialize Gemini client.
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
+    ):
+        """Initialize OpenAI-compatible client.
 
         Args:
-            api_key: Gemini API key
-            model: Model name (e.g., 'gemini-2.0-flash-001')
+            api_key: API key for the provider
+            model: Model identifier (e.g., 'anthropic/claude-3.5-sonnet')
+            base_url: API base URL (e.g., 'https://api.openai.com/v1', 'https://openrouter.ai/api/v1')
         """
-        self.api_key = api_key or Config.GEMINI_API_KEY
-        self.model = model or Config.GEMINI_MODEL
+        self.api_key = api_key or Config.OPENAI_LIKE_API_KEY
+        self.model = model or Config.OPENAI_LIKE_MODEL
+        self.base_url = base_url or Config.OPENAI_LIKE_BASE_URL
 
         if not self.api_key:
-            raise ValueError("GEMINI_API_KEY not configured")
+            raise ValueError("OPENAI_LIKE_API_KEY not configured")
 
-        self.client = genai.Client(api_key=self.api_key)
+        self.client = OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+        )
 
     def review_chunk(self, prompt: str, code_diff: str) -> str:
-        """Review code chunk using Gemini.
+        """Review code chunk using OpenAI-compatible API.
 
         Args:
             prompt: System prompt for review
@@ -46,24 +53,21 @@ class GeminiClient:
             Review response from the model
         """
         try:
-            system_instruction = self._system_prompt()
-            user_content = f"Prompt:\n{prompt}\n\nDiff:\n{code_diff}"
-
-            response = self.client.models.generate_content(
+            completion = self.client.chat.completions.create(
                 model=self.model,
-                contents=user_content,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.1,
-                    max_output_tokens=4000,
-                    thinking_config=types.ThinkingConfig(thinking_budget=0),
-                ),
+                messages=[
+                    {"role": "system", "content": self._system_prompt()},
+                    {"role": "user", "content": f"Prompt:\n{prompt}\n\nDiff:\n{code_diff}"},
+                ],
+                extra_body={
+                    "transforms": ["middle-out"],
+                },
             )
 
-            return response.text or ""
+            return completion.choices[0].message.content or ""
 
         except Exception as exc:
-            raise RuntimeError(f"Gemini API error: {exc}") from exc
+            raise RuntimeError(f"OpenAI-compatible API error: {exc}") from exc
 
     def _system_prompt(self) -> str:
         """Get system prompt for code review."""
@@ -108,45 +112,38 @@ class GeminiClient:
         Returns:
             Review response
         """
-        logger.debug(f"Sending code for analysis to Gemini ({self.model})...")
+        logger.debug(f"Sending code for analysis to {self.model}...")
         prompt = "Проведи ревью следующих изменений в коде:"
         return self.review_chunk(prompt, diffs)
 
-    def global_summary(self, context: str, pr_info: dict[str, Any] | None = None) -> str:
+    def global_summary(self, context: str) -> str:
         """Generate global summary of review.
 
         Args:
             context: Context from all file reviews
-            pr_info: Additional PR/MR information (title, url, author, etc.)
 
         Returns:
             Global summary response
         """
         logger.debug("Building global summary...")
-
         prompt = (
             "<task>\n"
             "На основе найденных проблем создай итоговое резюме с акцентом на общую оценку и положительные моменты.\n"
-            "ВАЖНО: Начни с краткого описания того, что было реализовано в данном изменении кода.\n"
             "</task>\n\n"
             "<format>\n"
-            "### Обзор изменений\n"
-            "[Краткое описание того, что было реализовано/исправлено в данном merge request]\n\n"
-            "### Статус ревью: APPROVED | REQUEST_CHANGES | COMMENT\n\n"
-            "### Основные проблемы по столпам:\n"
+            "## Статус: APPROVED | REQUEST_CHANGES | COMMENT\n\n"
+            "## Основные проблемы по столпам:\n"
             "1. ФУНКЦИОНАЛЬНОСТЬ: [краткий статус]\n"
             "2. АРХИТЕКТУРА: [краткий статус]\n"
             "3. СТИЛЬ И ЧИТАЕМОСТЬ: [краткий статус]\n"
             "4. ИНФРАСТРУКТУРА: [краткий статус]\n"
             "5. БЕЗОПАСНОСТЬ: [краткий статус]\n\n"
-            "### Что сделано хорошо:\n"
+            "## Что сделано хорошо:\n"
             "- [положительные аспекты кода]\n"
             "- [хорошие архитектурные решения]\n"
             "- [качественная реализация]\n\n"
-            "### Ключевые рекомендации:\n"
-            "- [список ключевых рекомендаций]\n\n"
-            "## Заключение\n"
-            "[Итоговый комментарий о качестве изменений и готовности к мержу]\n"
+            "## Ключевые рекомендации:\n"
+            "- [список ключевых рекомендаций]\n"
             "</format>\n\n"
             "<style>\n"
             "Пиши коротко, без эмодзи, используй форматирование Markdown.\n"
@@ -157,7 +154,7 @@ class GeminiClient:
         return result
 
     def is_available(self) -> bool:
-        """Check if Gemini client is available.
+        """Check if OpenAI-compatible client is available.
 
         Returns:
             True if API key is configured and client is ready
@@ -171,4 +168,4 @@ class GeminiClient:
         Returns:
             Provider name
         """
-        return f"Gemini ({self.model})"
+        return f"OpenAI-Like ({self.model})"

@@ -10,12 +10,18 @@ class ReportBuilder:
     def _format_author(self, author_data: Any) -> str:
         """Format author information for display."""
         if isinstance(author_data, dict):
-            # GitLab format
+            login = author_data.get("login", "")
+            html_url = author_data.get("html_url", "")
+
             name = author_data.get("name", "")
             username = author_data.get("username", "")
             web_url = author_data.get("web_url", "")
 
-            # Build author string
+            if login:
+                if html_url:
+                    return f"[@{login}]({html_url})"
+                return f"@{login}"
+
             if name and username:
                 if web_url:
                     return f"**{name}** ([@{username}]({web_url}))"
@@ -27,8 +33,10 @@ class ReportBuilder:
             if name:
                 return f"**{name}**"
             return "Unknown"
+
         if isinstance(author_data, str):
             return author_data
+
         return str(author_data)
 
     def generate_report(self, data: dict[str, Any]) -> str:
@@ -39,19 +47,31 @@ class ReportBuilder:
         ai_summary: str = data.get("ai_summary") or ""
         file_reviews: list[dict[str, Any]] = data.get("file_reviews") or []
 
-        # Format author information nicely
+        web_url = data.get("web_url", data.get("html_url", ""))
+        mr_id = data.get("mr_id", data.get("number", data.get("id", "")))
+
         author_info = self._format_author(author_data)
 
-        lines = [f"# {title}", f"## 👤 Автор: {author_info}"]
+        lines = [f"## 📝 Название: {title}"]
+        lines.append(f"## 👤 Автор: {author_info}")
 
-        # Add review summary at the top if we have AI analysis
+        if web_url and mr_id:
+            lines.append(f"## 🔗 Merge Request: [#{mr_id}]({web_url})")
+        else:
+            if web_url:
+                lines.append(f"## 🔗 Link: [View PR/MR]({web_url})")
+
+        description = data.get("description", "")
+        if description and description.strip():
+            lines.append("## 📋 Описание:")
+            lines.append(description.strip())
+
         if ai_summary:
-            lines.append("\n## 🎯 Результат ревью")
+            lines.append("\n## Результат ревью")
             lines.append(ai_summary.strip())
 
-        # Show file reviews with diffs and comments
         if file_reviews:
-            lines.append("\n## 📋 Детальный анализ изменений")
+            lines.append("\n## Детальный анализ изменений")
             for i, review in enumerate(file_reviews, 1):
                 file_name = review.get("file", "unknown")
                 diff = review.get("diff", "")
@@ -59,26 +79,22 @@ class ReportBuilder:
                 change_type = review.get("change_type", "modified")
                 new_content = review.get("new_content", "")
 
-                lines.append(f"\n### {i}. 📁 `{file_name}`")
+                lines.append(f"\n### {i}. `{file_name}`")
 
-                # Show change type
                 if change_type == "new":
-                    lines.append("**🆕 Новый файл**")
+                    lines.append("Новый файл")
                 elif change_type == "deleted":
-                    lines.append("**🗑️ Удалённый файл**")
+                    lines.append("Удалённый файл")
                 else:
-                    lines.append("**📝 Изменённый файл**")
+                    lines.append("Изменённый файл")
 
-                # Show diff in code block
-                lines.append("\n**Изменения:**")
+                lines.append("\nИзменения:")
                 lines.append("```diff")
                 lines.append(diff)
                 lines.append("```")
 
-                # Show full content for small files or new files
                 if change_type == "new" and new_content and len(new_content) < 2000:
-                    lines.append("\n**Полное содержимое файла:**")
-                    # Detect file extension for syntax highlighting
+                    lines.append("\nПолное содержимое файла:")
                     ext = file_name.split(".")[-1] if "." in file_name else ""
                     lang_map = {
                         "ts": "typescript",
@@ -107,14 +123,12 @@ class ReportBuilder:
                     lines.append(new_content)
                     lines.append("```")
 
-                # Show AI comments
                 if comments:
-                    lines.append("\n**💭 Анализ:**")
+                    lines.append("\nАнализ:")
                     lines.append(comments)
 
                 lines.append("\n---")
         else:
-            # Fallback to old format
             lines.append("\n### Changes:")
             if not changes:
                 lines.append("No changes detected.")

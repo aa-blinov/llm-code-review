@@ -1,369 +1,195 @@
-# Code Review с Google Gemini AI
+# Code Review with AI (Gemini + OpenAI-compatible APIs)
 
-Автоматизированный анализ merge request'ов с использованием искусственного интеллекта.
+Automated code review for merge/pull requests powered by AI.
 
-## 🎯 Зачем это нужно?
+Note: Application logs are in English. AI prompts and the final report are intentionally in Russian by design.
 
-Каждый разработчик знает боль code review:
+## Why
 
-- Ментальная усталость от просмотра сотен строк кода
-- Пропуск багов из-за невнимательности  
-- Субъективность оценок и непоследовательность
-- Времязатратность процесса
+Manual reviews are time-consuming and error-prone:
 
-Этот инструмент решает эти проблемы, предоставляя объективный AI-анализ изменений в коде с конкретными рекомендациями по улучшению.
+- Cognitive fatigue scanning hundreds of lines
+- Missed bugs and subtle issues
+- Subjective, inconsistent feedback
+- Expensive for busy teams
 
-## ⚡ Что умеет
+This tool provides objective AI analysis of diffs with actionable suggestions.
 
-**🧠 Анализ кода на уровне Senior+ инженера:**
+## Features
 
-- Выявление потенциальных багов и уязвимостей
-- Проверка соответствия best practices
-- Анализ архитектурных решений
-- Оценка производительности и безопасности
+- Senior-level code analysis (bugs, vulnerabilities, best practices, design, performance, security)
+- AI providers: Google Gemini; OpenAI-compatible APIs (OpenRouter, OpenAI, Ollama, Together AI, etc.)
+- Platforms: GitLab (cloud/self-hosted), GitHub
+- Smart diff handling: only added lines, optional full-file context, optimized token usage
+- Markdown reports with severity (CRITICAL/HIGH/MEDIUM/LOW) and links to authors and MR/PR
 
-**🌐 Поддержка платформ:**
-
-- GitLab (gitlab.com и self-hosted)
-- GitHub (github.com)
-
-**🔍 Умная обработка diff'ов:**
-
-- Анализирует только добавленный код (игнорирует удаляемые строки)
-- Загружает полный контекст файлов для лучшего понимания
-- Оптимизирует использование токенов API
-
-**📊 Профессиональные отчеты:**
-
-- Структурированные отчеты в Markdown
-- Категоризация проблем по важности (CRITICAL/HIGH/MEDIUM/LOW)  
-- Конкретные рекомендации с примерами кода
-- Ссылки на профили авторов и merge request'ы
-
-## 🏗️ Архитектура
-
-Проект построен по принципам чистой архитектуры с разделением ответственности:
+## Architecture
 
 ```text
 code-review/
 ├── src/
-│   ├── providers/       # Интеграция с GitLab/GitHub API
-│   ├── reviewers/       # AI анализ с помощью Gemini
-│   ├── parsers/         # Обработка diff'ов и файлов
-│   ├── report/          # Генерация отчетов
-│   ├── utils/           # Утилиты (HTTP, логирование)
-│   └── config.py        # Конфигурация
-├── tests/               # Unit тесты
-├── outputs/             # Готовые отчеты
-└── run_review.py        # Entry point
+│   ├── providers/       # GitLab/GitHub integrations
+│   ├── reviewers/       # AI analysis (Gemini/OpenAI-compatible APIs)
+│   ├── parsers/         # Diff and file handling
+│   ├── report/          # Report generation
+│   ├── utils/           # Utilities (HTTP, logging)
+│   └── config.py        # Configuration
+├── tests/               # Unit tests
+├── outputs/             # Generated reports
+└── run_review.py        # Entry point (python alternative)
 ```
 
-**Основные компоненты:**
+## Quickstart
 
-- **Providers** - абстракция для работы с разными Git платформами
-- **Reviewers** - AI анализ через Google Gemini
-- **Parsers** - обработка diff'ов и классификация файлов
-- **Report Builder** - генерация профессиональных отчетов
-
-## 🚀 Быстрый старт
-
-### Установка uv (рекомендуется)
-
-**Установка uv:**
+### Install uv (recommended)
 
 ```bash
 # macOS/Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# macOS с Homebrew
+# macOS (Homebrew)
 brew install uv
 
-# Windows
+# Windows (PowerShell)
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### Установка зависимостей
+### Install dependencies
 
-**С uv (рекомендуется):**
+Using uv:
 
 ```bash
-# Синхронизация зависимостей и создание виртуального окружения
 uv sync
-
-# Добавление новых зависимостей
-uv add package-name
-
-# Добавление dev зависимостей  
-uv add --dev package-name
 ```
 
-**Альтернативно с pip:**
+Alternative with pip:
 
 ```bash
-# Создание виртуального окружения
 python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# или .venv\Scripts\activate  # Windows
-
-# Установка зависимостей
+# Linux/macOS
+source .venv/bin/activate
+# Windows (PowerShell)
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-### Настройка API ключей
+## Configuration
 
-Создайте файл `.env` в корне проекта:
+Create a `.env` file in the project root:
 
 ```bash
-# Google Gemini API (обязательно)
-GEMINI_API_KEY=your_gemini_api_key_here
+# gemini or openai_like
+REVIEWER_PROVIDER=gemini
 
-# GitLab (если используете приватные репозитории)
+# Gemini
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
+
+# OpenAI-compatible
+OPENAI_LIKE_API_KEY=your_api_key_here
+OPENAI_LIKE_MODEL=anthropic/claude-3.5-sonnet
+OPENAI_LIKE_BASE_URL=https://openrouter.ai/api/v1
+
+# Git providers
 GITLAB_API_KEY=your_gitlab_token
 GITLAB_API_URL=https://gitlab.com/api/v4
-
-# GitHub (если используете приватные репозитории)
 GITHUB_API_KEY=your_github_token
 GITHUB_API_URL=https://api.github.com
 
-# Общие настройки
+# HTTP and providers
 TIMEOUT=30
+MAX_RETRIES=3
+PROVIDERS_MODE=online
 ```
 
-### Получение API ключей
+Where to get keys:
 
-**Google Gemini:**
+- Gemini: https://makersuite.google.com/app/apikey
+- OpenRouter: https://openrouter.ai/ (keys: https://openrouter.ai/keys)
+- OpenAI: https://platform.openai.com/api-keys
+- Ollama (local): http://localhost:11434/v1
+- Together AI: https://api.together.xyz/settings/api-keys
 
-1. Перейдите на [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Создайте новый API ключ
-3. Скопируйте ключ в переменную `GEMINI_API_KEY`
+Configuration reference:
 
-**GitLab (опционально):**
+| Variable | Required | Default | Description |
+|---------|----------|---------|-------------|
+| REVIEWER_PROVIDER | optional | gemini | gemini or openai_like |
+| GEMINI_API_KEY | required* | - | Google Gemini API key |
+| GEMINI_MODEL | optional | gemini-2.5-flash | Gemini model |
+| OPENAI_LIKE_API_KEY | required** | - | OpenAI-compatible API key |
+| OPENAI_LIKE_MODEL | optional | anthropic/claude-3.5-sonnet | Model name |
+| OPENAI_LIKE_BASE_URL | optional | https://openrouter.ai/api/v1 | API base URL |
+| GITLAB_API_KEY | optional | - | GitLab API token |
+| GITLAB_API_URL | optional | https://gitlab.com/api/v4 | GitLab API URL |
+| GITHUB_API_KEY | optional | - | GitHub API token |
+| GITHUB_API_URL | optional | https://api.github.com | GitHub API URL |
+| TIMEOUT | optional | 30 | HTTP timeout (s) |
+| MAX_RETRIES | optional | 3 | HTTP retries |
+| PROVIDERS_MODE | optional | online | online or mock |
 
-1. Перейдите в Settings → Access Tokens
-2. Создайте токен с scope: `read_api`, `read_repository`
+* Required if `REVIEWER_PROVIDER=gemini`  
+** Required if `REVIEWER_PROVIDER=openai_like`
 
-**GitHub (опционально):**
+## Usage
 
-1. Перейдите в Settings → Developer settings → Personal access tokens
-2. Создайте токен с scope: `repo`
-
-## 📋 Использование
-
-### Основные команды
-
-**С uv (рекомендуется):**
+Using uv:
 
 ```bash
-# Анализ GitLab MR
+# GitLab MR
 uv run python -m src.main "https://gitlab.com/user/project/-/merge_requests/123"
 
-# Анализ GitHub PR
+# GitHub PR
 uv run python -m src.main "https://github.com/user/project/pull/123"
 
-# Сохранить в определенную папку
-uv run python -m src.main -o /path/to/reports "MR_URL"
-
-# Справка
-uv run python -m src.main --help
+# Output folder
+uv run python -m src.main -o ./outputs "MR_URL"
 ```
 
-**Альтернативно с python:**
+Alternative with python:
 
 ```bash
-# Анализ GitLab MR
 python run_review.py "https://gitlab.com/user/project/-/merge_requests/123"
-
-# Анализ GitHub PR
 python run_review.py "https://github.com/user/project/pull/123"
-
-# Сохранить в определенную папку
-python run_review.py -o /path/to/reports "MR_URL"
-
-# Справка
-python run_review.py --help
+python run_review.py -o ./outputs "MR_URL"
 ```
 
-### Примеры URL
+Select provider (PowerShell example):
 
-**GitLab:**
-
-- `https://gitlab.com/user/project/-/merge_requests/123`
-- `https://gitlab.example.com/group/project/-/merge_requests/456`
-
-**GitHub:**
-
-- `https://github.com/user/project/pull/123`
-- `https://api.github.com/repos/user/project/pulls/123`
-
-## 🔧 Конфигурация
-
-Все настройки задаются через environment variables в файле `.env`:
-
-| Переменная | Обязательность | Значение по умолчанию | Описание |
-|------------|-----------------|----------------------|----------|
-| `GEMINI_API_KEY` | ✅ Обязательно | - | API ключ Google Gemini |
-| `GEMINI_MODEL` | ⚠️ Опционально | gemini-1.5-flash | Модель Gemini для анализа |
-| `GITLAB_API_KEY` | ⚠️ Опционально | - | GitLab API токен |
-| `GITLAB_API_URL` | ⚠️ Опционально | <https://gitlab.com/api/v4> | GitLab API URL |
-| `GITHUB_API_KEY` | ⚠️ Опционально | - | GitHub API токен |
-| `GITHUB_API_URL` | ⚠️ Опционально | <https://api.github.com> | GitHub API URL |
-| `TIMEOUT` | ⚠️ Опционально | 30 | Таймаут HTTP запросов |
-
-## 📊 Пример отчета
-
-```markdown
-# add: clear cache
-
-## 👤 Автор: [aa-blinov](https://gitlab.com/aa-blinov)
-## 🔗 Merge Request: [#11](https://gitlab.com/eora/dialog-systems/avandoc-admin-front-end/-/merge_requests/11)
-
-## 🔍 Изменения в файлах
-
-### 📄 src/assets/icons/index.ts
-**Тип:** modified | **Статус:** ✅ Анализ завершен
-
-```typescript
-export { ReactComponent as ReloadIcon } from './reload.svg';
+```powershell
+$env:REVIEWER_PROVIDER = "gemini"; uv run python -m src.main "MR_URL"
+$env:REVIEWER_PROVIDER = "openai_like"; uv run python -m src.main "MR_URL"
 ```
 
-**💭 Анализ:**
-[MEDIUM][FRONTEND] Добавлен экспорт иконки для функции очистки кэша...
+Outputs: reports are saved to the `outputs/` folder by default.
 
-## 📋 Итоговое резюме
+## Testing
 
-**Статус ревью:** ✅ ОДОБРЕНО
-
-**Критические проблемы:** Не обнаружены
-
-**Основные риски:** Минимальные для данного изменения...
-
-```
-
-## 🧪 Тестирование
-
-**С uv (рекомендуется):**
+Using uv:
 
 ```bash
-# Запуск всех тестов
-uv run pytest tests/ -v
-
-# Проверка качества кода
-uv run ./check_quality.sh
-
-# Только линтер (если ruff установлен)
-uv run ruff check src/ tests/
+uv run pytest -q
 ```
 
-**Альтернативно с python:**
+Alternative with python:
 
 ```bash
-# Запуск всех тестов
-python -m pytest tests/ -v
-
-# Проверка качества кода
-./check_quality.sh
-
-# Только линтер
-ruff check src/ tests/
+python -m pytest -q
 ```
 
-## 🔍 Качество кода
+## Support
 
-Проект использует современные инструменты для поддержания качества:
+If you face issues:
 
-- **ruff** - быстрый линтер и форматтер
-- **pytest** - тестирование
-- **type hints** - статическая типизация
-- **mypy** готовность - современный Python синтаксис
+1. Verify API keys are valid
+2. Ensure the MR/PR is public or you have access
+3. Check API rate limits
+4. Open an issue with details
 
-## 🚀 Технологии
+## License
 
-- **Python 3.12+** - современный синтаксис и возможности
-- **uv** - быстрый менеджер пакетов и зависимостей Python
-- **Google Gemini API** - AI анализ кода
-- **GitLab/GitHub API** - интеграция с Git платформами
-- **loguru** - современное логирование
-- **requests** - HTTP клиент
-- **pytest** - тестирование
-
-## 🤝 Разработка
-
-### Управление зависимостями
-
-**С uv:**
-
-```bash
-# Установка всех зависимостей
-uv sync
-
-# Добавление новой зависимости
-uv add requests
-
-# Добавление dev зависимости
-uv add --dev pytest
-
-# Удаление зависимости
-uv remove package-name
-
-# Обновление зависимостей
-uv lock --upgrade
-
-# Запуск команд в виртуальном окружении
-uv run python script.py
-uv run pytest
-```
-
-### Структура кода
-
-- `src/providers/` - интеграция с внешними API
-- `src/reviewers/` - AI логика анализа
-- `src/parsers/` - обработка diff'ов и контента
-- `src/report/` - генерация отчетов
-- `src/utils/` - общие утилиты
-
-### Добавление нового провайдера
-
-1. Создайте класс, наследующий `BaseProvider`
-2. Реализуйте методы `fetch_merge_request_data()` и `parse_merge_request_data()`
-3. Добавьте определение провайдера в `main.py`
-4. Создайте тесты в `tests/`
-
-### Принципы
-
-- **Single Responsibility** - каждый класс решает одну задачу
-- **Dependency Injection** - внедрение зависимостей через конструктор
-- **Тестируемость** - 100% покрытие критической логики
-- **Читаемость** - понятные имена и структура
-
-## 📈 Планы развития
-
-- [ ] Поддержка Bitbucket
-- [ ] Интеграция с Claude AI
-- [ ] Веб-интерфейс
-- [ ] CI/CD интеграция
-- [ ] Кэширование результатов
-- [ ] Batch обработка MR
-
-## 🐛 Известные ограничения
-
-- Требует доступ к сети для API вызовов
-- Ограничен rate limits API провайдеров
-- Gemini API может быть недоступен в некоторых регионах
-- Максимальный размер diff'а ограничен токенами модели
-
-## 📞 Поддержка
-
-При возникновении проблем:
-
-1. Проверьте правильность API ключей
-2. Убедитесь что MR/PR доступен публично или у вас есть права доступа
-3. Проверьте лимиты API
-4. Создайте issue с подробным описанием проблемы
-
-## 📄 Лицензия
-
-Проект распространяется под лицензией MIT. См. файл LICENSE для подробностей.
+MIT — see LICENSE for details.
 
 ---
 
-*Создано с ❤️ для улучшения процесса code review*
+Built to make code reviews better.

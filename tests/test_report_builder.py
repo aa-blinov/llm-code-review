@@ -9,7 +9,7 @@ def test_generate_report():
         "changes": [{"file": "test_file.py", "status": "modified"}, {"file": "new_file.py", "status": "added"}],
     }
     expected_report = (
-        "# Sample Merge Request\n## 👤 Автор: Test Author\n\n### Changes:\n"
+        "## 📝 Название: Sample Merge Request\n## 👤 Автор: Test Author\n\n### Changes:\n"
         "- test_file.py: modified\n- new_file.py: added\n"
     )
     report = report_builder.generate_report(sample_data)
@@ -19,6 +19,6 @@ def test_generate_report():
 def test_empty_report():
     report_builder = ReportBuilder()
     sample_data = {}
-    expected_report = "# No Title\n## 👤 Автор: Unknown\n\n### Changes:\nNo changes detected.\n"
+    expected_report = "## 📝 Название: No Title\n## 👤 Автор: Unknown\n\n### Changes:\nNo changes detected.\n"
     report = report_builder.generate_report(sample_data)
     assert report == expected_report

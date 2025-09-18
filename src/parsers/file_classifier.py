@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 class FileClassifier:
     def __init__(self):
         self.file_types = {
@@ -20,7 +23,7 @@ class FileClassifier:
         return "other"
 
     def get_file_extension(self, file_name):
-        return file_name.split(".")[-1] if "." in file_name else ""
+        return Path(file_name).suffix.lower()
 
     def classify_files(self, file_list):
         classified_files = {}

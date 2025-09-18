@@ -10,7 +10,6 @@ def rate_limit_decorator(max_calls, period):
             nonlocal calls
             current_time = time()
 
-            # Remove calls that are outside the time window
             while calls and calls[0] < current_time - period:
                 calls.popleft()
 
@@ -29,5 +28,4 @@ def rate_limit_decorator(max_calls, period):
 
 @rate_limit_decorator(max_calls=5, period=60)
 def fetch_data_from_api(url):
-    # Function to fetch data from the API
     pass  # Replace with actual API call logic
