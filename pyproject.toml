@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llm-code-review"
+version = "0.1.0"
+description = "Code Review Tool using LLM (GitHub/GitLab + Gemini)"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "aa-blinov", email = "your-email@example.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "Flask==2.0.1",
+    "requests==2.25.1",
+    "pydantic==1.8.2",
+    "markdown==3.3.4",
+    "loguru==0.7.2",
+    "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.2.2",
+]
+
+[project.scripts]
+code-review = "src.main:main"
+
+[project.urls]
+Homepage = "https://github.com/aa-blinov/llm-code-review"
+Repository = "https://github.com/aa-blinov/llm-code-review"
+Issues = "https://github.com/aa-blinov/llm-code-review/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2.2",
+]

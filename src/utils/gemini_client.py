@@ -10,6 +10,9 @@ from typing import Any
 import requests
 
 from src.config import Config
+from src.utils.logging import get_logger
+
+logger = get_logger()
 
 
 class GeminiClient:
@@ -62,7 +65,7 @@ class GeminiClient:
         )
 
     def review_diffs(self, diffs: str) -> str:
-        print("  🧠 Отправка кода на анализ в Gemini...")
+        logger.info("  🧠 Отправка кода на анализ в Gemini...")
         prompt = (
             "Проанализируй ТОЛЬКО изменения в коде и выдай конкретные замечания.\n\n"
             "ПОНИМАНИЕ DIFF ФОРМАТА:\n"
@@ -96,7 +99,7 @@ class GeminiClient:
         return self.review_chunk(prompt, diffs)
 
     def global_summary(self, context: str) -> str:
-        print("  🧠 Формирование итогового резюме...")
+        logger.info("  🧠 Формирование итогового резюме...")
         prompt = (
             "На основе детального анализа создай итоговое резюме ревью.\n\n"
             "СТРУКТУРА отчёта:\n\n"
@@ -122,5 +125,5 @@ class GeminiClient:
             "Будь конкретен, избегай общих фраз."
         )
         result = self.review_chunk(prompt, context)
-        print("  ✅ Итоговое резюме готово")
+        logger.info("  ✅ Итоговое резюме готово")
         return result
