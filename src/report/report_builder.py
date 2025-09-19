@@ -50,7 +50,14 @@ class ReportBuilder:
         web_url = data.get("web_url", data.get("html_url", ""))
         mr_id = data.get("mr_id", data.get("number", data.get("id", "")))
 
+        # Prefer richer author info if available (e.g., GitHub provides `user` with html_url)
         author_info = self._format_author(author_data)
+        if isinstance(author_data, str):
+            gh_user = data.get("user")
+            if isinstance(gh_user, dict):
+                enriched = self._format_author(gh_user)
+                if enriched and enriched != "Unknown":
+                    author_info = enriched
 
         lines = [f"## 📝 Название: {title}"]
         lines.append(f"## 👤 Автор: {author_info}")

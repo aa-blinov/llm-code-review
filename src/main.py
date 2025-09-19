@@ -2,6 +2,7 @@ import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 
+from src.config import Config
 from src.providers.github_provider import GitHubProvider
 from src.providers.gitlab_provider import GitLabProvider
 from src.report.report_builder import ReportBuilder
@@ -19,6 +20,18 @@ def main():
 
     logger.info("Starting merge request analysis...")
     logger.info(f"URL: {args.merge_request_url}")
+
+    # Log configured AI provider and model at startup
+    configured_provider = (Config.REVIEWER_PROVIDER or "unknown").lower()
+    if configured_provider == "gemini":
+        logger.info(f"AI configured: provider=gemini, model={Config.GEMINI_MODEL}")
+    elif configured_provider == "openai_like":
+        logger.info(
+            f"AI configured: provider=openai_like, model={Config.OPENAI_LIKE_MODEL}, "
+            f"base_url={Config.OPENAI_LIKE_BASE_URL}"
+        )
+    else:
+        logger.info(f"AI configured: provider={configured_provider}")
 
 
     if "github.com" in args.merge_request_url:

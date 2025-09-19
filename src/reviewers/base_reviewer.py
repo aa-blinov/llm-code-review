@@ -1,23 +1,23 @@
-"""Базовый класс для всех ревьюеров кода."""
+"""Base class for all code reviewers."""
 
 from abc import ABC, abstractmethod
 from typing import Any
 
 
 class BaseReviewer(ABC):
-    """Абстрактный базовый класс для ревьюеров кода."""
+    """Abstract base class for code reviewers."""
 
     def __init__(self, merge_request_data: dict[str, Any]):
-        """Инициализация ревьюера.
+        """Initialize reviewer.
 
         Args:
-            merge_request_data: Данные merge request с информацией о файлах и изменениях
+            merge_request_data: Merge request data with files and changes
         """
         self.merge_request_data = merge_request_data
         self._processed: dict[str, Any] = {}
 
     def process_merge_request(self) -> None:
-        """Обработка данных merge request для формирования отчета."""
+        """Process merge request data to build report payload."""
         mr_id = self.merge_request_data.get("number") or self.merge_request_data.get("id")
 
         self._processed = {
@@ -28,13 +28,15 @@ class BaseReviewer(ABC):
             "diffs": self.merge_request_data.get("diffs", ""),
             "web_url": self.merge_request_data.get("web_url", ""),
             "mr_id": str(mr_id) if mr_id else "",
+            # Pass through raw user info (e.g., GitHub user with html_url) for richer author formatting
+            "user": self.merge_request_data.get("user", {}),
         }
 
     def generate_report_data(self) -> dict[str, Any]:
-        """Генерация базовых данных для отчета.
+        """Generate base data for the report.
 
         Returns:
-            Словарь с данными для формирования отчета
+            Dict with data used to build the final report
         """
         if not self._processed:
             self.process_merge_request()
@@ -42,30 +44,30 @@ class BaseReviewer(ABC):
 
     @abstractmethod
     def get_review_comments(self) -> dict[str, Any]:
-        """Получение комментариев ревью от AI модели.
+        """Get AI review comments.
 
         Returns:
-            Словарь с результатами анализа:
+            Dict with analysis results:
             {
-                "diff_comments": List[str],  # Комментарии по изменениям
-                "summary": str,              # Общее резюме
-                "file_reviews": List[dict]   # Детальный анализ файлов
+                "diff_comments": List[str],  # Comments on diffs
+                "summary": str,              # Overall summary (RU)
+                "file_reviews": List[dict]   # Per-file analysis (RU)
             }
         """
 
     @abstractmethod
     def is_available(self) -> bool:
-        """Проверка доступности ревьюера (API ключ, настройки).
+        """Check reviewer availability (API key, config).
 
         Returns:
-            True если ревьюер может работать, False иначе
+            True if reviewer can operate, otherwise False
         """
 
     @property
     @abstractmethod
     def provider_name(self) -> str:
-        """Название провайдера ревьюера.
+        """Human-readable provider name.
 
         Returns:
-            Строка с названием провайдера (например, "Gemini", "OpenAI-Like")
+            Provider name string (e.g., "Gemini", "OpenAI-Like")
         """
