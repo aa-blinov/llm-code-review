@@ -168,3 +168,9 @@ class GeminiReviewer(BaseReviewer):
         if self._client:
             return f"Gemini ({self._client.model})"
         return "Gemini (unavailable)"
+
+    def get_usage(self) -> dict[str, int]:
+        """Return token usage collected by the underlying client."""
+        if self._client:
+            return self._client.get_usage()
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}

@@ -176,3 +176,9 @@ class OpenAILikeReviewer(BaseReviewer):
         if self._client:
             return self._client.provider_name
         return "OpenAI-Like (unavailable)"
+
+    def get_usage(self) -> dict[str, int]:
+        """Return token usage collected by the underlying client."""
+        if self._client:
+            return self._client.get_usage()
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}

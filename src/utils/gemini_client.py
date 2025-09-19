@@ -34,6 +34,9 @@ class GeminiClient:
             raise ValueError("GEMINI_API_KEY not configured")
 
         self.client = genai.Client(api_key=self.api_key)
+        # Token usage counters
+        self._prompt_tokens = 0
+        self._completion_tokens = 0
 
     def review_chunk(self, prompt: str, code_diff: str) -> str:
         """Review code chunk using Gemini.
@@ -59,6 +62,28 @@ class GeminiClient:
                     thinking_config=types.ThinkingConfig(thinking_budget=0),
                 ),
             )
+
+            # Accumulate token usage if available on response
+            try:
+                usage = getattr(response, "usage", None) or getattr(response, "usage_metadata", None)
+                if usage is not None:
+                    # Try multiple attribute names used across SDK versions
+                    in_tokens = (
+                        getattr(usage, "input_tokens", None)
+                        or getattr(usage, "prompt_token_count", None)
+                        or getattr(usage, "prompt_tokens", None)
+                        or 0
+                    )
+                    out_tokens = (
+                        getattr(usage, "output_tokens", None)
+                        or getattr(usage, "candidates_token_count", None)
+                        or getattr(usage, "completion_tokens", None)
+                        or 0
+                    )
+                    self._prompt_tokens += int(in_tokens or 0)
+                    self._completion_tokens += int(out_tokens or 0)
+            except Exception as exc:
+                logger.debug(f"Gemini usage parsing failed: {exc}")
 
             return response.text or ""
 
@@ -172,3 +197,16 @@ class GeminiClient:
             Provider name
         """
         return f"Gemini ({self.model})"
+
+    def get_usage(self) -> dict[str, int]:
+        """Get aggregated token usage for this client session.
+
+        Returns:
+            Dict with 'prompt_tokens', 'completion_tokens', 'total_tokens'.
+        """
+        total = self._prompt_tokens + self._completion_tokens
+        return {
+            "prompt_tokens": self._prompt_tokens,
+            "completion_tokens": self._completion_tokens,
+            "total_tokens": total,
+        }

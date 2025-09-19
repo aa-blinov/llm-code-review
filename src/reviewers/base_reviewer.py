@@ -42,6 +42,10 @@ class BaseReviewer(ABC):
             self.process_merge_request()
         return self._processed
 
+    def get_usage(self) -> dict[str, int]:
+        """Return token usage; reviewers without API usage return zeros."""
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
     @abstractmethod
     def get_review_comments(self) -> dict[str, Any]:
         """Get AI review comments.

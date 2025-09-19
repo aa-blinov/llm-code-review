@@ -42,6 +42,10 @@ class OpenAILikeClient:
             base_url=self.base_url,
         )
 
+        # Token usage counters
+        self._prompt_tokens: int = 0
+        self._completion_tokens: int = 0
+
     def review_chunk(self, prompt: str, code_diff: str) -> str:
         """Review code chunk using OpenAI-compatible API.
 
@@ -63,6 +67,16 @@ class OpenAILikeClient:
                     "transforms": ["middle-out"],
                 },
             )
+
+            # Accumulate token usage if provided by the API
+            try:
+                usage = getattr(completion, "usage", None)
+                if usage is not None:
+                    self._prompt_tokens += int(getattr(usage, "prompt_tokens", 0) or 0)
+                    self._completion_tokens += int(getattr(usage, "completion_tokens", 0) or 0)
+            except Exception as exc:
+                # Usage data is optional; log at debug level and continue
+                logger.debug(f"Usage parsing failed: {exc}")
 
             return completion.choices[0].message.content or ""
 
@@ -169,3 +183,16 @@ class OpenAILikeClient:
             Provider name
         """
         return f"OpenAI-Like ({self.model})"
+
+    def get_usage(self) -> dict[str, int]:
+        """Get aggregated token usage for this client session.
+
+        Returns:
+            Dict with 'prompt_tokens', 'completion_tokens', 'total_tokens'.
+        """
+        total = self._prompt_tokens + self._completion_tokens
+        return {
+            "prompt_tokens": self._prompt_tokens,
+            "completion_tokens": self._completion_tokens,
+            "total_tokens": total,
+        }

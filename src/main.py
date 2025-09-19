@@ -105,6 +105,17 @@ def main():
     out_path = out_dir / filename
     out_path.write_text(report, encoding="utf-8")
     logger.info(f"Report saved: {out_path}")
+    # Log token usage if available from reviewer
+    try:
+        usage = getattr(reviewer, "get_usage", None)
+        if callable(usage):
+            tokens = reviewer.get_usage()
+            in_t = tokens.get("prompt_tokens", 0)
+            out_t = tokens.get("completion_tokens", 0)
+            total_t = tokens.get("total_tokens", in_t + out_t)
+            logger.info(f"Token usage — input: {in_t}, output: {out_t}, total: {total_t}")
+    except Exception as exc:
+        logger.debug(f"Token usage logging failed: {exc}")
     logger.info("Analysis completed!")
 
 
