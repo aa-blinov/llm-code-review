@@ -25,6 +25,35 @@ class GitHubProvider(BaseProvider):
         self.api_key = api_key or os.getenv("GITHUB_API_KEY", Config.GITHUB_API_KEY)
         self.api_url = api_url or Config.GITHUB_API_URL
 
+    def _should_skip_file(self, filename: str) -> bool:
+        """Check if file should be skipped from analysis."""
+        skip_patterns = [
+            "__pycache__/",
+            ".pyc",
+            ".pyo",
+            ".pyd",
+            ".so",
+            ".dll",
+            ".exe",
+            ".bin",
+            ".zip",
+            ".tar",
+            ".gz",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".ico",
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx"
+        ]
+
+        filename_lower = filename.lower()
+        return any(pattern in filename_lower for pattern in skip_patterns)
+
     def fetch_merge_request(self, mr_url: str):  # type: ignore[override]
         return self.fetch_merge_request_data(mr_url)
 
@@ -108,6 +137,11 @@ class GitHubProvider(BaseProvider):
                 status = file_data.get("status", "modified")
                 patch = file_data.get("patch", "")
 
+                # Skip binary and cache files
+                if self._should_skip_file(filename):
+                    logger.info(f"[{i}/{len(files_data)}] Skipping binary/cache file: {filename}")
+                    continue
+
                 logger.info(f"[{i}/{len(files_data)}] Loading content: {filename}")
 
                 new_content = ""
@@ -120,6 +154,7 @@ class GitHubProvider(BaseProvider):
                             new_content = base64.b64decode(content_data["content"]).decode("utf-8")
                     except Exception as e:
                         logger.warning(f"Error loading content for {filename}: {e}")
+                        continue
 
                 enhanced_change = {
                     "file_path": filename,

@@ -21,6 +21,35 @@ class GitLabProvider(BaseProvider):
         self.api_key = api_key or os.getenv("GITLAB_API_KEY", Config.GITLAB_API_KEY)
         self.api_url = api_url or Config.GITLAB_API_URL
 
+    def _should_skip_file(self, filename: str) -> bool:
+        """Check if file should be skipped from analysis."""
+        skip_patterns = [
+            "__pycache__/",
+            ".pyc",
+            ".pyo",
+            ".pyd",
+            ".so",
+            ".dll",
+            ".exe",
+            ".bin",
+            ".zip",
+            ".tar",
+            ".gz",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".ico",
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx"
+        ]
+
+        filename_lower = filename.lower()
+        return any(pattern in filename_lower for pattern in skip_patterns)
+
     def fetch_merge_request(self, mr_url: str):  # type: ignore[override]
         return self.fetch_merge_request_data(mr_url)
 
@@ -97,13 +126,22 @@ class GitLabProvider(BaseProvider):
                         if not file_path:
                             continue
 
+                        # Skip binary and cache files
+                        if self._should_skip_file(file_path):
+                            logger.info(f"[{i}/{len(mr_data['changes'])}] Skipping binary/cache file: {file_path}")
+                            continue
+
                         logger.info(f"[{i}/{len(mr_data['changes'])}] Loading content: {file_path}")
 
                         new_content = ""
                         if new_path and mr_data.get("diff_refs", {}).get("head_sha"):
-                            new_content = self.get_file_content(
-                                project_path, new_path, mr_data["diff_refs"]["head_sha"]
-                            )
+                            try:
+                                new_content = self.get_file_content(
+                                    project_path, new_path, mr_data["diff_refs"]["head_sha"]
+                                )
+                            except Exception as e:
+                                logger.warning(f"Error loading content for {file_path}: {e}")
+                                continue
 
                         enhanced_change = {
                             "file_path": file_path,
