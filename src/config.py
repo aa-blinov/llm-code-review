@@ -13,10 +13,10 @@ if env_path.exists():
 
 class Config:
     # Git providers
-    GITHUB_API_KEY = os.getenv("API_KEY_GITHUB", os.getenv("GITHUB_API_KEY", ""))
+    GITHUB_API_KEY = os.getenv("GITHUB_API_KEY", "")
     GITHUB_API_URL = os.getenv("GITHUB_API_URL", "https://api.github.com")
 
-    GITLAB_API_KEY = os.getenv("API_KEY_GITLAB", os.getenv("GITLAB_API_KEY", ""))
+    GITLAB_API_KEY = os.getenv("GITLAB_API_KEY", "")
     GITLAB_API_URL = os.getenv("GITLAB_API_URL", "https://gitlab.com/api/v4")
 
     # AI Reviewers
@@ -28,7 +28,7 @@ class Config:
 
     # OpenAI-Like API (OpenRouter, Ollama, Together AI, etc.)
     OPENAI_LIKE_API_KEY = os.getenv("OPENAI_LIKE_API_KEY", "")
-    OPENAI_LIKE_MODEL = os.getenv("OPENAI_LIKE_MODEL", "anthropic/claude-3.5-sonnet")
+    OPENAI_LIKE_MODEL = os.getenv("OPENAI_LIKE_MODEL", "google/gemini-2.5-flash")
     OPENAI_LIKE_BASE_URL = os.getenv("OPENAI_LIKE_BASE_URL", "https://openrouter.ai/api/v1")
 
     # HTTP settings

@@ -35,8 +35,7 @@ code-review/
 │   ├── utils/           # Utilities (HTTP, logging)
 │   └── config.py        # Configuration
 ├── tests/               # Unit tests
-├── outputs/             # Generated reports
-└── run_review.py        # Entry point (python alternative)
+└── outputs/             # Generated reports
 ```
 
 ## Quickstart
@@ -56,21 +55,8 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 ### Install dependencies
 
-Using uv:
-
 ```bash
 uv sync
-```
-
-Alternative with pip:
-
-```bash
-python -m venv .venv
-# Linux/macOS
-source .venv/bin/activate
-# Windows (PowerShell)
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
 ```
 
 ## Configuration
@@ -87,7 +73,7 @@ GEMINI_MODEL=gemini-2.5-flash
 
 # OpenAI-compatible
 OPENAI_LIKE_API_KEY=your_api_key_here
-OPENAI_LIKE_MODEL=anthropic/claude-3.5-sonnet
+OPENAI_LIKE_MODEL=google/gemini-2.5-flash
 OPENAI_LIKE_BASE_URL=https://openrouter.ai/api/v1
 
 # Git providers
@@ -109,6 +95,8 @@ Where to get keys:
 - OpenAI: https://platform.openai.com/api-keys
 - Ollama (local): http://localhost:11434/v1
 - Together AI: https://api.together.xyz/settings/api-keys
+- GitLab: https://gitlab.com/-/user_settings/personal_access_tokens (scopes: `api`, `read_api`, `read_repository`)
+- GitHub: https://github.com/settings/tokens (scopes: `repo`, `public_repo`)
 
 Configuration reference:
 
@@ -118,7 +106,7 @@ Configuration reference:
 | GEMINI_API_KEY | required* | - | Google Gemini API key |
 | GEMINI_MODEL | optional | gemini-2.5-flash | Gemini model |
 | OPENAI_LIKE_API_KEY | required** | - | OpenAI-compatible API key |
-| OPENAI_LIKE_MODEL | optional | anthropic/claude-3.5-sonnet | Model name |
+| OPENAI_LIKE_MODEL | optional | google/gemini-2.5-flash | Model name |
 | OPENAI_LIKE_BASE_URL | optional | https://openrouter.ai/api/v1 | API base URL |
 | GITLAB_API_KEY | optional | - | GitLab API token |
 | GITLAB_API_URL | optional | https://gitlab.com/api/v4 | GitLab API URL |
@@ -133,8 +121,6 @@ Configuration reference:
 
 ## Usage
 
-Using uv:
-
 ```bash
 # GitLab MR
 uv run python -m src.main "https://gitlab.com/user/project/-/merge_requests/123"
@@ -144,14 +130,9 @@ uv run python -m src.main "https://github.com/user/project/pull/123"
 
 # Output folder
 uv run python -m src.main -o ./outputs "MR_URL"
-```
 
-Alternative with python:
-
-```bash
-python run_review.py "https://gitlab.com/user/project/-/merge_requests/123"
-python run_review.py "https://github.com/user/project/pull/123"
-python run_review.py -o ./outputs "MR_URL"
+# Alternative using installed entry point
+uv run code-review "https://gitlab.com/user/project/-/merge_requests/123"
 ```
 
 Select provider (PowerShell example):
@@ -165,16 +146,8 @@ Outputs: reports are saved to the `outputs/` folder by default.
 
 ## Testing
 
-Using uv:
-
 ```bash
 uv run pytest -q
-```
-
-Alternative with python:
-
-```bash
-python -m pytest -q
 ```
 
 ## Support
