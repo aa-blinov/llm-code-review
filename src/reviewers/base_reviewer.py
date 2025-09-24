@@ -30,6 +30,8 @@ class BaseReviewer(ABC):
             "mr_id": str(mr_id) if mr_id else "",
             # Pass through raw user info (e.g., GitHub user with html_url) for richer author formatting
             "user": self.merge_request_data.get("user", {}),
+            # Provide enhanced per-file changes (diff + new_content) if available from providers
+            "enhanced_changes": self.merge_request_data.get("enhanced_changes", []),
         }
 
     def generate_report_data(self) -> dict[str, Any]:

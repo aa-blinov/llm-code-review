@@ -107,6 +107,10 @@ class GitLabProvider(BaseProvider):
 
             project_path = parts[0].replace("/", "%2F")
             mr_id = parts[1]
+            if not mr_id.isdigit():
+                raise ValueError(
+                    f"Invalid GitLab MR URL format: expected numeric id after '/merge_requests/', got '{mr_id}'"
+                )
 
             logger.info(f"Fetching MR #{mr_id} data from project {parts[0]}...")
             api_url = f"{self.api_url}/projects/{project_path}/merge_requests/{mr_id}/changes"
@@ -166,15 +170,17 @@ class GitLabProvider(BaseProvider):
         except Exception as e:
             logger.error(f"Error fetching GitLab data: {e}")
 
-        return {
-            "id": 1,
-            "title": "Sample Merge Request",
-            "description": "This is a sample merge request.",
-            "author": "author_name",
-            "changes": [],
-            "diffs": "",
-            "enhanced_changes": [],
-        }
+            return {
+                "id": 1,
+                "title": "Sample Merge Request",
+                "description": "This is a sample merge request.",
+                "author": "author_name",
+                "changes": [],
+                "diffs": "",
+                "enhanced_changes": [],
+                "_fetch_error": True,
+                "_error_message": str(e),
+            }
 
     def parse_merge_request_data(self, data: dict[str, Any]) -> dict[str, Any]:
         author_data = data.get("author", {})
@@ -183,13 +189,46 @@ class GitLabProvider(BaseProvider):
         else:
             author = {"username": author_data} if author_data else {}
 
-        return {
+        # Normalize changes list to a simple schema used by ReportBuilder
+        normalized_changes: list[dict[str, Any]] = []
+        for change in data.get("changes", []) or []:
+            old_path = change.get("old_path")
+            new_path = change.get("new_path")
+            file_path = new_path or old_path or ""
+
+            # Derive status similar to GitHub semantics
+            if change.get("new_file"):
+                status = "added"
+            elif change.get("deleted_file"):
+                status = "removed"
+            elif change.get("renamed_file"):
+                status = "renamed"
+            else:
+                status = "modified"
+
+            normalized_changes.append(
+                {
+                    "old_path": old_path,
+                    "new_path": new_path,
+                    "diff": change.get("diff", ""),
+                    "file": file_path,
+                    "status": status,
+                }
+            )
+
+        result = {
             "id": data.get("id"),
             "title": data.get("title"),
             "description": data.get("description"),
             "author": author,
-            "changes": data.get("changes", []),
+            "changes": normalized_changes,
             "diffs": data.get("diffs", ""),
             "web_url": data.get("web_url", ""),  # GitLab MR URL
             "enhanced_changes": data.get("enhanced_changes", []),
         }
+        # Propagate error flags if present
+        if data.get("_fetch_error"):
+            result["_fetch_error"] = True
+            if data.get("_error_message"):
+                result["_error_message"] = data.get("_error_message")
+        return result

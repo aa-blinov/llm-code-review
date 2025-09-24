@@ -61,6 +61,9 @@ class GeminiReviewer(BaseReviewer):
                         context_parts.append(f"\nКонкретные изменения (что поменялось):\n```diff\n{diff}\n```")
                         context_parts.append(
                             "\nВАЖНО: Анализируй только изменения, показанные в diff выше. "
+                            "Считай '-' как было ДО, '+' как стало ПОСЛЕ и оценивай пару '-'→'+'. "
+                            "Если '+' исправляет недочёт из '-', не отмечай это как проблему. "
+                            "Не предлагай те же изменения повторно — они уже применены. "
                             "Используй полный файл только для понимания контекста."
                         )
 
@@ -68,22 +71,24 @@ class GeminiReviewer(BaseReviewer):
 
                     try:
                         file_comments = self._client.review_diffs(full_context)
-                        if file_comments.strip() and "Код выглядит корректно" not in file_comments:
-                            file_reviews.append(
-                                {
-                                    "file": file_path,
-                                    "diff": diff,
-                                    "comments": file_comments.strip(),
-                                    "new_content": new_content,
-                                    "change_type": "new"
-                                    if change["new_file"]
-                                    else "deleted"
-                                    if change["deleted_file"]
-                                    else "modified",
-                                }
-                            )
-                            all_comments.append(file_comments)
-                            logger.debug(f"Found comments for {file_path}")
+                        comments_text = (file_comments or "").strip()
+                        if "Код выглядит корректно" in comments_text:
+                            comments_text = ""
+
+                        review_entry = {
+                            "file": file_path,
+                            "diff": diff,
+                            "comments": comments_text,
+                            "new_content": new_content,
+                            "change_type": "new"
+                            if change["new_file"]
+                            else "deleted"
+                            if change["deleted_file"]
+                            else "modified",
+                        }
+                        file_reviews.append(review_entry)
+                        if comments_text:
+                            all_comments.append(comments_text)
                     except Exception as e:
                         logger.error(f"File analysis error for {file_path}: {e}")
                     finally:
@@ -94,7 +99,7 @@ class GeminiReviewer(BaseReviewer):
                 if all_comments:
                     summary = self._client.global_summary("\n".join(all_comments), self.merge_request_data)
                 else:
-                    summary = "Серьёзных проблем в коде не обнаружено."
+                    summary = "Проблем в коде не обнаружено."
             except Exception as exc:
                 logger.debug(f"Summary build error: {exc}")
                 summary = ""
@@ -129,9 +134,12 @@ class GeminiReviewer(BaseReviewer):
 
             try:
                 file_comments = self._client.review_diffs(file_diff)
-                if file_comments.strip() and "Код выглядит корректно" not in file_comments:
-                    file_reviews.append({"file": file_name, "diff": file_diff, "comments": file_comments.strip()})
-                    all_comments.append(file_comments)
+                comments_text = (file_comments or "").strip()
+                if "Код выглядит корректно" in comments_text:
+                    comments_text = ""
+                file_reviews.append({"file": file_name, "diff": file_diff, "comments": comments_text})
+                if comments_text:
+                    all_comments.append(comments_text)
             except Exception as exc:
                 logger.debug(f"File analysis error for {file_name}: {exc}")
 
@@ -139,7 +147,7 @@ class GeminiReviewer(BaseReviewer):
             if all_comments:
                 summary = self._client.global_summary("\n".join(all_comments), self.merge_request_data)
             else:
-                summary = "Серьёзных проблем в коде не обнаружено."
+                summary = "Проблем в коде не обнаружено."
         except Exception as exc:
             logger.debug(f"Summary generation error: {exc}")
             summary = ""

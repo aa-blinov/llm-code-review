@@ -54,6 +54,17 @@ def main():
     else:
         merge_request_data = provider.fetch_merge_request(args.merge_request_url)
 
+    if merge_request_data.get("_fetch_error"):
+        msg = (
+            "Некорректный код ответа от сервиса при получении MR. "
+            "Проверьте корректность ссылки на Merge Request и доступы."
+        )
+        err_detail = merge_request_data.get("_error_message", "")
+        if err_detail:
+            logger.error(f"Provider fetch error: {err_detail}")
+        logger.error(msg)
+        return
+
     logger.info(f"Data received: '{merge_request_data.get('title', 'Unknown')}'")
     author_info = merge_request_data.get("author") or (
         merge_request_data.get("user", {}) if isinstance(merge_request_data.get("user"), dict) else {}

@@ -48,7 +48,8 @@ class GitHubProvider(BaseProvider):
             ".doc",
             ".docx",
             ".xls",
-            ".xlsx"
+            ".xlsx",
+            ".lock",
         ]
 
         filename_lower = filename.lower()
@@ -103,6 +104,10 @@ class GitHubProvider(BaseProvider):
                 if len(parts) == 2:
                     repo_path = parts[0]  # owner/repo
                     pr_number = parts[1]
+                    if not pr_number.isdigit():
+                        raise ValueError(
+                            f"Invalid GitHub PR URL format: expected numeric id after '/pull/', got '{pr_number}'"
+                        )
                     api_url = f"{self.api_url}/repos/{repo_path}/pulls/{pr_number}"
                 else:
                     raise ValueError("Invalid GitHub PR URL format")
@@ -173,7 +178,17 @@ class GitHubProvider(BaseProvider):
 
         except Exception as e:
             logger.error(f"Error fetching data: {e}")
-            raise
+            # Return explicit error-marked payload so the caller can abort gracefully
+            return {
+                "id": None,
+                "title": "GitHub PR (fetch error)",
+                "user": {},
+                "body": "",
+                "files": [],
+                "enhanced_changes": [],
+                "_fetch_error": True,
+                "_error_message": str(e),
+            }
 
     def parse_merge_request_data(self, data: dict[str, Any]) -> dict[str, Any]:
         changes = []
@@ -182,6 +197,9 @@ class GitHubProvider(BaseProvider):
         if "files" in data:
             for file_data in data["files"]:
                 filename = file_data.get("filename", "")
+                # Skip non-code / lock / binary files from the final report
+                if self._should_skip_file(filename):
+                    continue
                 status = file_data.get("status", "modified")
                 patch = file_data.get("patch", "")
 
@@ -199,7 +217,7 @@ class GitHubProvider(BaseProvider):
                     diffs.append(f"+++ b/{filename}")
                     diffs.append(patch)
 
-        return {
+        result = {
             "id": data.get("id"),
             "number": data.get("number"),
             "title": data.get("title"),
@@ -212,3 +230,8 @@ class GitHubProvider(BaseProvider):
             "html_url": data.get("html_url", ""),
             "enhanced_changes": data.get("enhanced_changes", []),
         }
+        if data.get("_fetch_error"):
+            result["_fetch_error"] = True
+            if data.get("_error_message"):
+                result["_error_message"] = data.get("_error_message")
+        return result

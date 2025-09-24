@@ -102,7 +102,7 @@ class OpenAILikeReviewer(BaseReviewer):
                 if all_comments:
                     summary = self._client.global_summary("\n".join(all_comments))
                 else:
-                    summary = "Серьёзных проблем в коде не обнаружено."
+                    summary = "Проблем в коде не обнаружено."
             except Exception as exc:
                 logger.debug(f"Summary build error: {exc}")
                 summary = ""
@@ -147,7 +147,7 @@ class OpenAILikeReviewer(BaseReviewer):
             if all_comments:
                 summary = self._client.global_summary("\n".join(all_comments))
             else:
-                summary = "Серьёзных проблем в коде не обнаружено."
+                summary = "Проблем в коде не обнаружено."
         except Exception as exc:
             logger.debug(f"Summary generation error: {exc}")
             summary = ""

@@ -46,6 +46,7 @@ class ReportBuilder:
         ai_diff_comments: list[str] = data.get("ai_diff_comments") or []
         ai_summary: str = data.get("ai_summary") or ""
         file_reviews: list[dict[str, Any]] = data.get("file_reviews") or []
+        enhanced_changes: list[dict[str, Any]] = data.get("enhanced_changes") or []
 
         web_url = data.get("web_url", data.get("html_url", ""))
         mr_id = data.get("mr_id", data.get("number", data.get("id", "")))
@@ -130,15 +131,30 @@ class ReportBuilder:
                     lines.append(new_content)
                     lines.append("```")
 
-                if comments:
-                    lines.append("\nАнализ:")
-                    lines.append(comments)
+                # Всегда выводим раздел анализа; если LLM не дала комментариев — ставим LGTM
+                lines.append("\nАнализ:")
+                lines.append(comments if comments else "LGTM, доработок не требуется.")
 
                 lines.append("\n---")
         else:
             lines.append("\n### Changes:")
             if not changes:
-                lines.append("No changes detected.")
+                # If we have enhanced_changes but no AI file reviews, render per-file diffs minimally
+                if enhanced_changes:
+                    for i, ch in enumerate(enhanced_changes, 1):
+                        file_name = ch.get("file_path") or ch.get("new_path") or ch.get("old_path") or "unknown"
+                        diff = ch.get("diff", "")
+                        status = (
+                            "added" if ch.get("new_file") else "removed" if ch.get("deleted_file") else "modified"
+                        )
+                        lines.append(f"- {file_name}: {status}")
+                        if diff:
+                            lines.append("\n```diff")
+                            lines.append(diff)
+                            lines.append("```")
+                            lines.append("")
+                else:
+                    lines.append("No changes detected.")
             else:
                 lines.extend(f"- {c.get('file')}: {c.get('status')}" for c in changes)
 
