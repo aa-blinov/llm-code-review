@@ -25,7 +25,7 @@ class GeminiClient:
 
         Args:
             api_key: Gemini API key
-            model: Model name (e.g., 'gemini-2.0-flash-001')
+            model: Model name (e.g., 'gemini-2.5-flash')
         """
         self.api_key = api_key or Config.GEMINI_API_KEY
         self.model = model or Config.GEMINI_MODEL
