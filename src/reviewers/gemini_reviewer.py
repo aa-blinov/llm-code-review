@@ -6,6 +6,11 @@ from tqdm import tqdm
 from src.config import Config
 from src.parsers.diff_parser import DiffParser
 from src.reviewers.base_reviewer import BaseReviewer
+from src.utils.cross_file_context import (
+    build_cross_file_section,
+    build_pr_map,
+    find_related_changes,
+)
 from src.utils.gemini_client import GeminiClient
 
 
@@ -35,6 +40,13 @@ class GeminiReviewer(BaseReviewer):
 
             logger.info(f"Starting AI analysis of {len(enhanced_changes)} files...")
 
+            # Build a PR-level map once — shared context across all file reviews
+            pr_map = build_pr_map(
+                enhanced_changes,
+                pr_title=self.merge_request_data.get("title", ""),
+                pr_description=self.merge_request_data.get("description", ""),
+            )
+
             with tqdm(total=len(enhanced_changes), desc="Analyzing files", unit="file") as pbar:
                 for change in enhanced_changes:
                     file_path = change["file_path"]
@@ -42,6 +54,10 @@ class GeminiReviewer(BaseReviewer):
                     diff = change["diff"]
                     new_content = change["new_content"]
                     context_parts = []
+
+                    # --- PR-level map (gives the LLM a bird's-eye view) ---
+                    if len(enhanced_changes) > 1 and pr_map:
+                        context_parts.append(pr_map)
 
                     if change["new_file"]:
                         context_parts.append(f"Новый файл: `{file_path}`")
@@ -66,6 +82,12 @@ class GeminiReviewer(BaseReviewer):
                             "Не предлагай те же изменения повторно — они уже применены. "
                             "Используй полный файл только для понимания контекста."
                         )
+
+                    # --- Cross-file context (imports / dependents within this PR) ---
+                    deps, dependents = find_related_changes(file_path, new_content, enhanced_changes)
+                    cross_ctx = build_cross_file_section(deps, dependents)
+                    if cross_ctx:
+                        context_parts.append(cross_ctx)
 
                     full_context = "\n".join(context_parts)
 
@@ -103,6 +125,23 @@ class GeminiReviewer(BaseReviewer):
             except Exception as exc:
                 logger.debug(f"Summary build error: {exc}")
                 summary = ""
+
+            # --- Holistic cross-file pass (catches issues invisible per-file) ---
+            if len(enhanced_changes) > 1:
+                logger.info("Running holistic cross-file analysis...")
+                try:
+                    holistic = self._client.holistic_review(
+                        enhanced_changes,
+                        pr_title=self.merge_request_data.get("title", ""),
+                    )
+                    if holistic and "Межмодульных проблем не обнаружено" not in holistic:
+                        summary = (
+                            f"### Межмодульный анализ\n{holistic}\n\n---\n\n{summary}"
+                            if summary
+                            else f"### Межмодульный анализ\n{holistic}"
+                        )
+                except Exception as exc:
+                    logger.debug(f"Holistic review error: {exc}")
 
             return {
                 "diff_comments": [],

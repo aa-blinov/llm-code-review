@@ -111,14 +111,20 @@ class GeminiClient:
             "Анализируй только изменения из diff. Используй полный контекст файла только для понимания смысла.\n"
             "Цель — находить реальные проблемы в получившемся коде (состояние ПОСЛЕ), \n"
             "а не описывать или повторять внесённые изменения.\n"
+            "Если в контексте присутствуют связанные файлы (зависимости/зависимые модули), \n"
+            "проверь, не нарушен ли контракт между ними: изменились ли сигнатуры, типы, \n"
+            "поведение функций так, что вызывающий/вызываемый код может сломаться.\n"
             "</task>\n\n"
             "<pillars>\n"
-            "Ревью должно базироваться на пяти столпах:\n"
+            "Ревью должно базироваться на шести столпах:\n"
             "1. ФУНКЦИОНАЛЬНОСТЬ (FUNC): логические ошибки, обработка исключений, runtime-ошибки.\n"
             "2. АРХИТЕКТУРА (ARCH): нарушение SOLID/DRY/KISS, связность, чистота кода, паттерны проектирования.\n"
             "3. СТИЛЬ И ЧИТАЕМОСТЬ (STYLE): naming, сложность кода, магические числа, комментарии.\n"
             "4. ИНФРАСТРУКТУРА (INFRA): производительность, управление ресурсами, развертывание.\n"
             "5. БЕЗОПАСНОСТЬ (SEC): SQL-инъекции, XSS, CSRF, безопасные пути файлов, права доступа.\n"
+            "6. МЕЖМОДУЛЬНАЯ КОНСИСТЕНТНОСТЬ (CROSS): нарушение контрактов между модулями, "
+            "изменение сигнатур функций/методов без обновления вызывающего кода, "
+            "нарушение ожиданий зависимых/зависящих файлов, циклические зависимости.\n"
             "</pillars>\n\n"
             "<output_structure>\n"
             "- Группируй проблемы СТРОГО по приоритетам: CRITICAL → HIGH → MEDIUM → LOW.\n"
@@ -126,6 +132,7 @@ class GeminiClient:
             "- Используй Markdown для форматирования.\n\n"
             "Формат для каждой проблемы:\n"
             "[<столп>][<приоритет>] <исходный_файл>:<номер_строки> - <описание_проблемы> - <как_исправить>\n"
+            "Для CROSS-проблем указывай оба файла: [CROSS][CRITICAL] fileA.py:42 → fileB.py:17 - ...\n"
             "</output_structure>\n\n"
             "<style>\n"
             "Пиши коротко, по делу, без эмодзи. Не повторяй содержимое строк '+', \n"
@@ -209,6 +216,67 @@ class GeminiClient:
             Provider name
         """
         return f"Gemini ({self.model})"
+
+    def holistic_review(self, enhanced_changes: list[dict], pr_title: str = "") -> str:
+        """Run a holistic cross-file review pass over the entire PR.
+
+        Based on SOTA research (AACR-Bench 2026), ~15% of defects require
+        repository-level context and cannot be detected by per-file analysis.
+        This method sends all diffs together to find cross-module issues.
+
+        Args:
+            enhanced_changes: All changed files with their diffs.
+            pr_title: PR title for context.
+
+        Returns:
+            Cross-file issues found, or empty string if none.
+        """
+        if len(enhanced_changes) <= 1:
+            return ""
+
+        # Build a compact PR view — diffs only (no full file content) to stay within token budget
+        compact_parts = []
+        if pr_title:
+            compact_parts.append(f"PR: {pr_title}")
+        compact_parts.append(f"Изменено файлов: {len(enhanced_changes)}\n")
+
+        max_diff_per_file = 1500
+        for c in enhanced_changes:
+            fp = c.get("file_path", "?")
+            diff = c.get("diff", "")
+            if not diff:
+                continue
+            snippet = diff[:max_diff_per_file]
+            if len(diff) > max_diff_per_file:
+                snippet += "\n... (сокращено)"
+            compact_parts.append(f"### `{fp}`\n```diff\n{snippet}\n```")
+
+        compact_pr = "\n".join(compact_parts)
+
+        holistic_prompt = (
+            "<task>\n"
+            "Проведи ЦЕЛОСТНЫЙ анализ всего Pull Request, глядя НА ВСЕ изменения СРАЗУ.\n"
+            "Твоя задача — найти ТОЛЬКО проблемы, которые невозможно обнаружить при анализе файлов по отдельности:\n"
+            "1. Нарушения контракта между модулями: изменилась сигнатура функции в файле A, "
+            "но вызовы в файле B не обновлены.\n"
+            "2. Несогласованность данных/типов: одна часть кода передаёт X, другая ожидает Y.\n"
+            "3. Неполные изменения: добавлен новый атрибут/метод, но не обновлены все "
+            "зависимые места (serializers, validators, tests).\n"
+            "4. Потенциальные дублирования или противоречия между изменениями в разных файлах.\n"
+            "5. Отсутствие тестов для нового кода при наличии test-файлов в PR.\n"
+            "</task>\n\n"
+            "<output>\n"
+            "Если нашёл — перечисли конкретно: [CROSS][<приоритет>] fileA.py → fileB.py — описание.\n"
+            "Если проблем нет — напиши только: 'Межмодульных проблем не обнаружено.'\n"
+            "НЕ повторяй проблемы, которые видны из анализа одного файла.\n"
+            "</output>"
+        )
+        logger.debug("Running holistic cross-file review pass...")
+        try:
+            return self.review_chunk(holistic_prompt, compact_pr)
+        except Exception as exc:
+            logger.debug(f"Holistic review error: {exc}")
+            return ""
 
     def get_usage(self) -> dict[str, int]:
         """Get aggregated token usage for this client session.
